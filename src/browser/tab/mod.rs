@@ -1839,15 +1839,26 @@ impl Tab {
         Ok(())
     }
 
-fn bypass_permissions(&self) -> Result<()> {
+    fn bypass_permissions(&self) -> Result<()> {
     let script = r"
         const originalQuery = window.navigator.permissions.query;
-        window.navigator.permissions.__proto__.query = parameters =>
-            parameters.name === 'notifications'
-                ? Promise.resolve({state: Notification.permission})
-                : parameters.name === 'clipboard-read' || parameters.name === 'clipboard-write'
-                    ? Promise.resolve({state: 'granted'})
-                    : originalQuery(parameters);
+        window.navigator.permissions.__proto__.query = (parameters) => {
+            if (parameters.name === 'notifications') {
+                return Promise.resolve({
+                    name: 'notifications',
+                    state: Notification.permission,
+                    onchange: null
+                });
+            }
+            if (parameters.name === 'clipboard-read' || parameters.name === 'clipboard-write') {
+                return Promise.resolve({
+                    name: parameters.name,
+                    state: 'granted',
+                    onchange: null
+                });
+            }
+            return originalQuery(parameters);
+        };
     ";
     
     self.call_method(Page::AddScriptToEvaluateOnNewDocument {
