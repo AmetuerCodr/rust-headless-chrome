@@ -1839,21 +1839,26 @@ impl Tab {
         Ok(())
     }
 
-    fn bypass_permissions(&self) -> Result<()> {
-        let r = "const originalQuery = window.navigator.permissions.query;
+fn bypass_permissions(&self) -> Result<()> {
+    let script = r"
+        const originalQuery = window.navigator.permissions.query;
         window.navigator.permissions.__proto__.query = parameters =>
-        parameters.name === 'notifications'
-            ? Promise.resolve({state: Notification.permission})
-            : originalQuery(parameters);";
-
-        self.call_method(Page::AddScriptToEvaluateOnNewDocument {
-            source: r.to_string(),
-            world_name: None,
-            include_command_line_api: None,
-            run_immediately: None,
-        })?;
-        Ok(())
-    }
+            parameters.name === 'notifications'
+                ? Promise.resolve({state: Notification.permission})
+                : parameters.name === 'clipboard-read' || parameters.name === 'clipboard-write'
+                    ? Promise.resolve({state: 'granted'})
+                    : originalQuery(parameters);
+    ";
+    
+    self.call_method(Page::AddScriptToEvaluateOnNewDocument {
+        source: script.to_string(),
+        world_name: None,
+        include_command_line_api: None,
+        run_immediately: None,
+    })?;
+    
+    Ok(())
+}
 
     fn bypass_plugins(&self) -> Result<()> {
         self.call_method(Page::AddScriptToEvaluateOnNewDocument {
